@@ -1,0 +1,187 @@
+-- [[ KAITUN HUB - FULL LOGIC ]] --
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+local StartTime = tick()
+
+-- [[ HÀM XỬ LÝ LOGIC SỐ ]] --
+local function parseValue(val)
+    local str = tostring(val):gsub(",", ""):gsub(" ", "")
+    local suffix = str:sub(-1):upper()
+    local num = tonumber(str:match("[%d%.]+")) or 0
+    if suffix == "K" then return num * 1000
+    elseif suffix == "M" then return num * 1000000
+    elseif suffix == "B" then return num * 1000000000 end
+    return tonumber(str) or 0
+end
+
+-- [[ GIAO DIỆN GUI ]] --
+local ScreenGui = Instance.new("ScreenGui", Player:WaitForChild("PlayerGui"))
+ScreenGui.Name = "KaitunHub"
+ScreenGui.ResetOnSpawn = false
+
+-- Loading Action
+local LoadingFrame = Instance.new("Frame", ScreenGui)
+LoadingFrame.Size = UDim2.new(1, 0, 1, 0)
+LoadingFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+LoadingFrame.ZIndex = 10
+
+local LoadText = Instance.new("TextLabel", LoadingFrame)
+LoadText.Size = UDim2.new(0, 200, 0, 50)
+LoadText.Position = UDim2.new(0.5, -100, 0.5, -25)
+LoadText.BackgroundTransparency = 1
+LoadText.TextColor3 = Color3.fromRGB(0, 255, 255)
+LoadText.TextSize = 30
+LoadText.Font = Enum.Font.GothamBold
+LoadText.Text = "KAITUN LOADING..."
+
+task.spawn(function()
+    task.wait(2)
+    LoadingFrame:Destroy()
+end)
+
+-- Main GUI
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 300, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- Cho phép di chuyển bằng chuột
+
+local UICorner = Instance.new("UICorner", MainFrame)
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Text = "KAITUN HUB v1.0"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Title.Font = Enum.Font.GothamBold
+
+local InfoLabel = Instance.new("TextLabel", MainFrame)
+InfoLabel.Size = UDim2.new(1, -20, 1, -40)
+InfoLabel.Position = UDim2.new(0, 10, 0, 35)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+InfoLabel.TextSize = 14
+InfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+InfoLabel.TextYAlignment = Enum.TextYAlignment.Top
+InfoLabel.Font = Enum.Font.Gotham
+
+-- Cập nhật thông số GUI
+task.spawn(function()
+    while task.wait(1) do
+        local leaderstats = Player:FindFirstChild("leaderstats")
+        local reb = leaderstats and (leaderstats:FindFirstChild("Rebirths") or leaderstats:FindFirstChild("\240\159\152\135Rebirths"))
+        local win = leaderstats and (leaderstats:FindFirstChild("Wins") or leaderstats:FindFirstChild("\240\159\143\129Wins"))
+        
+        local timeElapsed = math.floor(tick() - StartTime)
+        local minutes = math.floor(timeElapsed / 60)
+        local seconds = timeElapsed % 60
+        
+        InfoLabel.Text = string.format([[
+            Tên: %s
+            Rebirth: %s
+            Tổng Wins: %s
+            Thời gian: %dm %ds
+            Event Mode: %s
+        ]], Player.Name, (reb and reb.Value or "0"), (win and win.Value or "0"), minutes, seconds, tostring(getgenv().Config.ModeEvent))
+    end
+end)
+
+-- [[ LOGIC CHỨC NĂNG ]] --
+
+-- 1. Auto Clicker
+task.spawn(function()
+    local ClickRemote = ReplicatedStorage.Packages.Knit.Services.ClickService.RF.Click
+    while true do
+        pcall(function() ClickRemote:InvokeServer() end)
+        task.wait(0)
+    end
+end)
+
+-- 2. Auto Win (Fly)
+task.spawn(function()
+    local HRP = Player.Character:WaitForChild("HumanoidRootPart")
+    local startPos = Vector3.new(-2562, -8, 0)
+    local endPos = Vector3.new(-584062, -8, 0)
+    local speed = 80000000 
+
+    local bv = Instance.new("BodyVelocity", HRP)
+    bv.Velocity = Vector3.zero
+    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+
+    while true do
+        HRP.CFrame = CFrame.new(startPos)
+        task.wait(0.1)
+        local direction = (endPos - startPos).Unit
+        local distance = (endPos - startPos).Magnitude
+        local currentDistance = 0
+        while currentDistance < distance do
+            local dt = task.wait()
+            currentDistance = math.min(currentDistance + (speed * dt), distance)
+            HRP.CFrame = CFrame.new(startPos + direction * currentDistance)
+        end
+        task.wait(0)
+    end
+end)
+
+-- 3. World Logic (Event & Island)
+task.spawn(function()
+    local TravelRemote = ReplicatedStorage.Packages.Knit.Services.WorldService.RF.Travel
+    local EggRemote = ReplicatedStorage.Packages.Knit.Services.EggService.RF.Open
+    
+    while true do
+        local rb = parseValue((Player.leaderstats:FindFirstChild("Rebirths") or Player.leaderstats:FindFirstChild("\240\159\152\135Rebirths")).Value)
+        
+        if getgenv().Config.ModeEvent then
+            -- EVENT MODE
+            if rb >= 0 and rb < 999 then
+                TravelRemote:InvokeServer("Event", false, "Event")
+                task.wait(300) -- Đợi 5 phút
+                EggRemote:InvokeServer("Mushroom Egg", "1", {}, nil)
+            end
+        else
+            -- ISLAND MODE
+            if rb >= 1 and rb < 2 then TravelRemote:InvokeServer("Space", false, nil)
+            elseif rb >= 3 and rb < 4 then TravelRemote:InvokeServer("Ocean", false, nil)
+            elseif rb >= 5 and rb < 6 then TravelRemote:InvokeServer("Candy", false, nil)
+            elseif rb >= 9 and rb < 10 then TravelRemote:InvokeServer("Hell", false, nil)
+            elseif rb >= 12 and rb < 13 then TravelRemote:InvokeServer("Private", false, nil)
+            elseif rb >= 15 and rb < 16 then TravelRemote:InvokeServer("Castle", false, nil)
+            elseif rb >= 18 and rb < 19 then TravelRemote:InvokeServer("Robot", false, nil)
+            end
+        end
+        task.wait(5)
+    end
+end)
+
+-- 4. Rebirth Logic (Dòng Rebirth đa mốc)
+task.spawn(function()
+    local RebirthRemote = ReplicatedStorage.Packages.Knit.Services.RebirthService.RF.Rebirth
+    local milestones = {
+        250000000, 175000000, 150000000, 125000000, 100000000, 75000000, 50000000, 
+        25000000, 10000000, 5000000, 2500000, 1000000, 500000, 250000, 100000, 75000, 50000
+    }
+    
+    while true do
+        local winsValue = Player.leaderstats:FindFirstChild("Wins") or Player.leaderstats:FindFirstChild("\240\159\143\129Wins")
+        local currentWins = parseValue(winsValue.Value)
+        
+        for _, m in ipairs(milestones) do
+            if currentWins >= m then
+                RebirthRemote:InvokeServer()
+                task.wait(2)
+                break
+            end
+        end
+        
+        -- 5 phút tự động Rebirth 1 lần theo yêu cầu cuối
+        task.wait(300)
+        RebirthRemote:InvokeServer()
+    end
+end)
